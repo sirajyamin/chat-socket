@@ -40,7 +40,7 @@ const startSocketServer = async () => {
 
   const io = new Server(server, {
     cors: {
-      origin: allowedOrigins,
+      origin: "https://nsevensecurity.com",
       methods: ["GET", "POST"],
       credentials: true,
     },
