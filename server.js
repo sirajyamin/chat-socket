@@ -62,7 +62,7 @@ const startSocketServer = async () => {
     res.status(500).send("Something broke!");
   });
 
-  server.listen(8001, () => {
+  server.listen(8002, () => {
     console.log(`Socket.IO Server running on http://localhost:8002`);
   });
 };
