@@ -22,7 +22,7 @@ const startSocketServer = async () => {
     "http://localhost:3000",
     "http://localhost:4000",
     "http://localhost:8000",
-    "https://nsevensecurity.com",
+    "https://jobifyy.com",
   ];
 
   const corsOptions = {
@@ -63,7 +63,7 @@ const startSocketServer = async () => {
   });
 
   server.listen(8001, () => {
-    console.log(`Socket.IO Server running on http://localhost:8001`);
+    console.log(`Socket.IO Server running on http://localhost:8002`);
   });
 };
 
