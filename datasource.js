@@ -1,6 +1,7 @@
 const { default: mongoose } = require("mongoose");
 const Message = require("./models/message");
 const User = require("./models/user");
+const Booking = require("./models/booking");
 
 let io;
 const onlineUsers = new Map();
@@ -69,20 +70,17 @@ const handleAuthentication = (socket) => async (userId, callback) => {
 
 const handleSendMessage =
   (socket) =>
-  async ({ sender, recipient, conversationId, content }, callback) => {
+  async ({ sender, recipient, conversationId, booking, content }, callback) => {
     try {
-      console.log("📬 Sending message:");
       let message = new Message({
         sender,
         recipient,
-        conversationId,
+        booking,
         content,
+        conversationId,
         type: "message",
       });
-
       await message.save();
-      console.log("✅ Message saved:", message._id);
-
       const receiverSocketId = onlineUsers.get(recipient);
       console.log("🎯 Receiver socket ID:", receiverSocketId);
 
@@ -148,11 +146,16 @@ const handleMessageSeen =
 
 const handleMakeOffer =
   (socket) =>
-  async ({ sender, recipient, amount, terms, conversationId }, callback) => {
+  async (
+    { sender, recipient, booking, amount, terms, conversationId },
+    callback
+  ) => {
+    console.log("Booking ID:", booking);
     try {
       const message = new Message({
         sender,
         recipient,
+        booking,
         conversationId,
         type: "offer",
         offer: {
@@ -162,6 +165,34 @@ const handleMakeOffer =
         },
       });
       await message.save();
+
+      await Booking.findByIdAndUpdate(booking, {
+        $set: { status: "negotiating" },
+      });
+
+      const bookingg = await Booking.findById(booking).populate("user");
+      console.log("Booking By Finding", bookingg);
+
+      // Fix: Get the actual user ID from the populated object
+      const bookingUserId = bookingg?.user._id.toString();
+
+      console.log("Booking User ID:", bookingUserId);
+      console.log("Sender ID:", sender);
+
+      if (bookingUserId !== sender) {
+        const bookingDetails = await Booking.findByIdAndUpdate(
+          booking,
+          {
+            $inc: { offersCount: 1 },
+            $push: {
+              offers: {
+                amount: amount,
+              },
+            },
+          },
+          { new: true }
+        );
+      }
 
       const receiverSocketId = onlineUsers.get(recipient);
       if (receiverSocketId) {
@@ -197,13 +228,22 @@ const handleMakeOffer =
 const handleRespondOffer =
   (socket) =>
   async (
-    { sender, recipient, conversationId, response, counterOffer, terms },
+    {
+      sender,
+      recipient,
+      booking,
+      conversationId,
+      response,
+      counterOffer,
+      terms,
+    },
     callback
   ) => {
     try {
       const message = new Message({
         sender,
         recipient,
+        booking,
         conversationId,
         type: "offer",
         offer: {
@@ -213,6 +253,35 @@ const handleRespondOffer =
         },
       });
       await message.save();
+
+      const bookingg = await Booking.findById(booking).populate("user");
+      console.log("Booking By Finding", bookingg);
+
+      // Fix: Get the actual user ID from the populated object
+      const bookingUserId = bookingg?.user._id.toString();
+
+      console.log("Booking User ID:", bookingUserId);
+      console.log("Sender ID:", sender);
+
+      if (
+        bookingUserId !== sender &&
+        response !== "accepted" &&
+        response !== "rejected"
+      ) {
+        const bookingDetails = await Booking.findByIdAndUpdate(
+          booking,
+          {
+            $inc: { offersCount: 1 },
+            $push: {
+              offers: {
+                amount: counterOffer,
+                status: response,
+              },
+            },
+          },
+          { new: true, runValidators: true }
+        );
+      }
 
       const receiverSocketId = onlineUsers.get(recipient);
       if (receiverSocketId) {
@@ -225,6 +294,15 @@ const handleRespondOffer =
         });
       }
 
+      if (response === "accepted") {
+        const update = await Booking.findOneAndUpdate(
+          message.booking._id,
+          {
+            status: "negotiated",
+          },
+          { new: true }
+        );
+      }
       if (callback) {
         callback({
           status: "ok",
@@ -232,7 +310,6 @@ const handleRespondOffer =
           message,
         });
       }
-
       socket.emit("offer-replied", message.toObject());
     } catch (error) {
       console.error("Offer response error:", error);
@@ -295,9 +372,32 @@ const handleDisconnect = (socket) => async () => {
   }
 };
 
-// Function to generate a random chat_id
-const generateChatId = () => {
-  return Math.floor(Math.random() * 1000000); // Generates a random number between 0 and 999999
+const getShortBooking = async (args) => {
+  const { bookingId } = args;
+  try {
+    const booking = await Booking.findById(bookingId).select(
+      "name price status"
+    );
+    if (!booking) {
+      return { success: false, message: "Error 404" };
+    }
+    return {
+      success: true,
+      message: "Booking found",
+      booking: JSON.parse(JSON.stringify(booking)),
+    };
+  } catch (error) {
+    console.error("Error fetching conversations:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch conversations",
+      statusCode: 500,
+      booking: null,
+    };
+  }
 };
 
 module.exports.ChatService = {
@@ -307,5 +407,5 @@ module.exports.ChatService = {
   handleAuthentication,
   handleSendMessage,
   handleMakeOffer,
-  generateChatId,
+  getShortBooking,
 };

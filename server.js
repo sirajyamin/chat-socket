@@ -22,7 +22,7 @@ const startSocketServer = async () => {
     "http://localhost:3000",
     "http://localhost:4000",
     "http://localhost:8000",
-    "https://nsevensecurity.com",
+    "http://192.168.100.2:3000",
   ];
 
   const corsOptions = {
@@ -40,7 +40,7 @@ const startSocketServer = async () => {
 
   const io = new Server(server, {
     cors: {
-      origin: "https://nsevensecurity.com",
+      origin: allowedOrigins,
       methods: ["GET", "POST"],
       credentials: true,
     },

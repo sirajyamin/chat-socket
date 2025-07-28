@@ -9,7 +9,11 @@ const messageSchema = new Schema(
       ref: "UserModel",
       required: true,
     },
-    chat_id: { type: String },
+    booking: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BookingModel",
+      required: true,
+    },
     content: { type: String },
     offer: {
       amount: Number,
